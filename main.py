@@ -5,7 +5,7 @@ print("Welcome to Shitty Classic Client pick a playername\n")
 name = input("Pick Playername\n")
 ip = input("Whats The Server IP Adress\n")
 port = input("Whats The Server Port\n")
-pvn_hex = input("Whats The Server Protocol Numbber \n")
+pvn_hex = input("Whats The Server Protocol Number \n")
 if pvn_hex.startswith('x'):
     pvn_hex = pvn_hex[1:]
 pvn_int = int(pvn_hex, 16)
