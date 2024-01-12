@@ -22,7 +22,7 @@ client.connect((ip, int(port)))
 client.send(packet)
 
 while True:
-    #chat handeler
+    #chat handler
     message = input("Type a Message\n")
     packet2 = bytearray()
     packet2 += b"\x0d"
