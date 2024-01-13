@@ -107,17 +107,17 @@ while True:
                 y_fixed = plswork(y)
                 z_fixed = plswork(z)
 
-                sbPacket = bytearray()
-                sbPacket += b'\x08' 
-                sbPacket += bytes([0xFF])
-                sbPacket += x_fixed.to_bytes(2, byteorder='big', signed=True) 
-                sbPacket += y_fixed.to_bytes(2, byteorder='big', signed=True)
-                sbPacket += z_fixed.to_bytes(2, byteorder='big', signed=True)
-                sbPacket += yaw.to_bytes(1, byteorder='big', signed=True)
-                sbPacket += pitch.to_bytes(1, byteorder='big', signed=True)
+                tpPacket = bytearray()
+                tpPacket += b'\x08' 
+                tpPacket += bytes([0xFF])
+                tpPacket += x_fixed.to_bytes(2, byteorder='big', signed=True) 
+                tpPacket += y_fixed.to_bytes(2, byteorder='big', signed=True)
+                tpPacket += z_fixed.to_bytes(2, byteorder='big', signed=True)
+                tpPacket += yaw.to_bytes(1, byteorder='big', signed=True)
+                tpPacket += pitch.to_bytes(1, byteorder='big', signed=True)
 
-                print(sbPacket)
-                client.send(sbPacket)
+                print(tpPacket)
+                client.send(tpPacket)
             except IndexError:
                 print("Invalid command format.")
 
@@ -139,16 +139,16 @@ while True:
                 y_fixed = plswork(y)
                 z_fixed = plswork(z)
 
-                sbPacket = bytearray()
-                sbPacket += b'\x05' 
-                sbPacket += x_fixed.to_bytes(2, byteorder='big', signed=True) 
-                sbPacket += y_fixed.to_bytes(2, byteorder='big', signed=True)
-                sbPacket += z_fixed.to_bytes(2, byteorder='big', signed=True)
-                sbPacket += mode.to_bytes(1, byteorder='big', signed=True)
-                sbPacket += id.to_bytes(1, byteorder='big', signed=True)
+                tpPacket = bytearray()
+                tpPacket += b'\x05' 
+                tpPacket += x_fixed.to_bytes(2, byteorder='big', signed=True) 
+                tpPacket += y_fixed.to_bytes(2, byteorder='big', signed=True)
+                tpPacket += z_fixed.to_bytes(2, byteorder='big', signed=True)
+                tpPacket += mode.to_bytes(1, byteorder='big', signed=True)
+                tpPacket += id.to_bytes(1, byteorder='big', signed=True)
 
-                print(sbPacket)
-                client.send(sbPacket)
+                print(tpPacket)
+                client.send(tpPacket)
             except IndexError:
                 print("Invalid command format.")
 
