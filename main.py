@@ -4,14 +4,14 @@ import threading
 stop_thread = False
 
 # Dexrn: Please work!!!
-def cordfix(value):
+def coordFix(value):
    scale_factor = 2 ** 5 
    scaled_value = int(value * scale_factor)
    clamped_value = max(min(scaled_value, 1023), -1024)
    return clamped_value // 32 
 
 
-def receive_messages(client_socket):
+def packets(client_socket):
     global stop_thread
     while not stop_thread:
         try:
@@ -65,7 +65,7 @@ print("Welcome to Shitty Classic Client! Pick a Player Name\n")
 name = input("Pick Player Name\n> ")
 mppass1 = input('MPPass (Default is "-")\n> ')
 mppass = str(mppass1) if mppass1 else "-"
-ip = input("Server IP Address\n>")
+ip = input("Server IP Address\n> ")
 port1 = input("Server Port (Default is 25565)\n> ")
 port = int(port1) if port1 else 25565
 pvn_hex = input("PVN\n> ")
@@ -86,12 +86,12 @@ client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((ip, int(port)))
 client.send(packet)
 
-receive_thread = threading.Thread(target=receive_messages, args=(client,))
+receive_thread = threading.Thread(target=packets, args=(client,))
 receive_thread.start()
 
 while True:
     # chat handler
-    message = input()
+    message = input("> ")
     if "/" in message: 
         if message.startswith("/tp"):
             command = message.split()
@@ -103,9 +103,9 @@ while True:
                 yaw = float(command[4])
                 pitch = float(command[5])
 
-                x_fixed = cordfix(x)
-                y_fixed = cordfix(y)
-                z_fixed = cordfix(z)
+                x_fixed = coordFix(x)
+                y_fixed = coordFix(y)
+                z_fixed = coordFix(z)
 
                 tpPacket = bytearray()
                 tpPacket += b'\x08' 
@@ -135,9 +135,9 @@ while True:
                 mode = int(command[4])
                 id = int(command[5])
 
-                x_fixed = cordfix(x)
-                y_fixed = cordfix(y)
-                z_fixed = cordfix(z)
+                x_fixed = coordFix(x)
+                y_fixed = coordFix(y)
+                z_fixed = coordFix(z)
 
                 sbPacket = bytearray()
                 sbPacket += b'\x05' 
