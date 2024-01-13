@@ -45,7 +45,7 @@ def receive_messages(client_socket):
                     except:
                         continue
 
-                if packet_id == 0x0c:
+                if packet_id == 0x0c: # Check if packet ID is 0x0c Disconnect Other Player Message
                     try:
                         decoded_data = data[1:].decode("ascii")  
                         print(decoded_data)
