@@ -62,13 +62,13 @@ def receive_messages(client_socket):
 
 # connection settings and connect packet
 print("Welcome to Shitty Classic Client! Pick a Player Name\n")
-name = input("Pick Player Name\n")
-mppass1 = input('MPPass (Default is "-")\n')
+name = input("Pick Player Name\n> ")
+mppass1 = input('MPPass (Default is "-")\n> ')
 mppass = str(mppass1) if mppass1 else "-"
-ip = input("Server IP Address\n")
-port1 = input("Server Port (Default is 25565)\n")
+ip = input("Server IP Address\n>")
+port1 = input("Server Port (Default is 25565)\n> ")
 port = int(port1) if port1 else 25565
-pvn_hex = input("PVN\n")
+pvn_hex = input("PVN\n> ")
 if pvn_hex.startswith('x'):
     pvn_hex = pvn_hex[1:]
 pvn_int = int(pvn_hex, 16)
@@ -91,7 +91,7 @@ receive_thread.start()
 
 while True:
     # chat handler
-    message = input("\n")
+    message = input()
     if "/" in message: 
         if message.startswith("/tp"):
             command = message.split()
@@ -125,6 +125,43 @@ while True:
             except ValueError:
                 print("Invalid coordinates or block type. Please provide valid integers.")
 
+        if message.startswith("/setblock"):
+            command = message.split()
+            try:
+                pname = name
+                x = int(command[1])
+                y = int(command[2])
+                z = int(command[3])
+                mode = int(command[4])
+                id = int(command[5])
+
+                x_fixed = plswork(x)
+                y_fixed = plswork(y)
+                z_fixed = plswork(z)
+
+                sbPacket = bytearray()
+                sbPacket += b'\x05' 
+                sbPacket += x_fixed.to_bytes(2, byteorder='big', signed=True) 
+                sbPacket += y_fixed.to_bytes(2, byteorder='big', signed=True)
+                sbPacket += z_fixed.to_bytes(2, byteorder='big', signed=True)
+                sbPacket += mode.to_bytes(1, byteorder='big', signed=True)
+                sbPacket += id.to_bytes(1, byteorder='big', signed=True)
+
+                print(sbPacket)
+                client.send(sbPacket)
+            except IndexError:
+                print("Invalid command format.")
+
+
+            except ValueError:
+                print("Invalid coordinates or block type. Please provide valid integers.")
+
+        if message.startswith("/stop"):
+            stop_thread = True  # Set the flag to signal the receiving thread to stop
+            receive_thread.join()  # Wait for the receiving thread to finish
+            client.close()
+            break
+
 
     else:
         packet2 = bytearray()
@@ -134,9 +171,3 @@ while True:
 
         # TCP Socket Horrors 2
         client.send(packet2)
-        
-        if "/stop" in message:
-            stop_thread = True  # Set the flag to signal the receiving thread to stop
-            receive_thread.join()  # Wait for the receiving thread to finish
-            client.close()
-            break
