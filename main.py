@@ -17,7 +17,7 @@ def receive_messages(client_socket):
                     decoded_data = data[2:].decode("ascii")  # Assuming data format: [packet_id, length, payload]
                     print(decoded_data)
 
-                if packet_id == 0x01:  # Check if packet ID is 0x00 Ping 
+                if packet_id == 0x01:  # Check if packet ID is 0x01 Ping 
                     pass
                 
                 if packet_id == 0x0d:  # Check if packet ID is 0x0d Chat 
