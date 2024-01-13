@@ -2,6 +2,7 @@ import socket
 import threading
 import re
 import os
+import gzip
 
 stop_thread = False
 showblockupdates = False
@@ -88,6 +89,33 @@ def packets(client_socket):
                     except:
                         continue
 
+                if packet_id == levelInitializePacket:
+                    try:
+                        # Process the Level Initialize packet (replace this with your logic)
+                        print("Received Level Initialize Packet")
+
+                        # You can add more handling or processing specific to the Level Initialize packet here
+
+                    except Exception as e:
+                        print("Error processing Level Initialize Packet:", str(e))
+                        continue
+
+                if packet_id == levelDataChunkPacket:
+                    try:
+                        # Extract the chunk data from the packet (excluding the packet ID)
+                        chunk_data = data[2:]
+
+                        # Remove trailing 0x00 padding
+                        chunk_data = chunk_data.rstrip(b'\x00')
+
+                        # Append the chunk data to the server_level.dat file
+                        with open('server_level.dat', 'wb') as level_file:
+                            level_file.write(chunk_data)
+                        
+                    except Exception as e:
+                        print("Error processing Level Data Chunk Packet:", str(e))
+                        continue
+
                 if packet_id == pingPacket:
                     pass
 
@@ -147,7 +175,6 @@ def packets(client_socket):
                         # print(f"Player Pos Update: {X}, {Y}, {Z}")
                     except:
                         continue
-
             except UnicodeDecodeError as e:
                 print("Error decoding message:", str(e))
                 continue
