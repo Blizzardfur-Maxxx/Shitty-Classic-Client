@@ -4,7 +4,7 @@ import threading
 stop_thread = False
 
 # Dexrn: Please work!!!
-def plswork(value):
+def cordfix(value):
    scale_factor = 2 ** 5 
    scaled_value = int(value * scale_factor)
    clamped_value = max(min(scaled_value, 1023), -1024)
@@ -103,9 +103,9 @@ while True:
                 yaw = float(command[4])
                 pitch = float(command[5])
 
-                x_fixed = plswork(x)
-                y_fixed = plswork(y)
-                z_fixed = plswork(z)
+                x_fixed = cordfix(x)
+                y_fixed = cordfix(y)
+                z_fixed = cordfix(z)
 
                 tpPacket = bytearray()
                 tpPacket += b'\x08' 
@@ -135,20 +135,20 @@ while True:
                 mode = int(command[4])
                 id = int(command[5])
 
-                x_fixed = plswork(x)
-                y_fixed = plswork(y)
-                z_fixed = plswork(z)
+                x_fixed = cordfix(x)
+                y_fixed = cordfix(y)
+                z_fixed = cordfix(z)
 
-                tpPacket = bytearray()
-                tpPacket += b'\x05' 
-                tpPacket += x_fixed.to_bytes(2, byteorder='big', signed=True) 
-                tpPacket += y_fixed.to_bytes(2, byteorder='big', signed=True)
-                tpPacket += z_fixed.to_bytes(2, byteorder='big', signed=True)
-                tpPacket += mode.to_bytes(1, byteorder='big', signed=True)
-                tpPacket += id.to_bytes(1, byteorder='big', signed=True)
+                sbPacket = bytearray()
+                sbPacket += b'\x05' 
+                sbPacket += x_fixed.to_bytes(2, byteorder='big', signed=True) 
+                sbPacket += y_fixed.to_bytes(2, byteorder='big', signed=True)
+                sbPacket += z_fixed.to_bytes(2, byteorder='big', signed=True)
+                sbPacket += mode.to_bytes(1, byteorder='big', signed=True)
+                sbPacket += id.to_bytes(1, byteorder='big', signed=True)
 
-                print(tpPacket)
-                client.send(tpPacket)
+                print(sbPacket)
+                client.send(sbPacket)
             except IndexError:
                 print("Invalid command format.")
 
