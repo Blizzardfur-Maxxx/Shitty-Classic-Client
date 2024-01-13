@@ -22,8 +22,11 @@ def receive_messages(client_socket):
                 packet_id = data[0]
 
                 if packet_id == 0x00:  # Check if packet ID is 0x00 Server Identification 
-                    decoded_data = data[2:].decode("ascii")  # Assuming data format: [packet_id, length, payload]
-                    print(decoded_data)
+                    try:
+                        decoded_data = data[2:].decode("ascii")  # Assuming data format: [packet_id, length, payload]
+                        print(decoded_data)
+                    except:
+                        continue
 
                 if packet_id == 0x01:  # Check if packet ID is 0x01 Ping 
                     pass
@@ -51,9 +54,11 @@ def receive_messages(client_socket):
                     
             except UnicodeDecodeError as e:
                 print("Error decoding message:", str(e))
+                continue
         except socket.error as e:
             print("Error receiving message:", str(e))
-            break
+            continue
+            
 
 # connection settings and connect packet
 print("Welcome to Shitty Classic Client! Pick a Player Name\n")
@@ -72,7 +77,8 @@ packet = bytearray()
 packet += b"\x00"
 packet += pvn
 packet += name.ljust(64).encode("ascii")
-packet += mppass.ljust(1024).encode("ascii")
+# magic value no changey
+packet += mppass.ljust(64).encode("ascii")
 packet += b"\x00"
 
 # TCP Socket Horrors
