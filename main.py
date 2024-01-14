@@ -1,50 +1,12 @@
 import socket
 import threading
-import re
 import os
-import gzip
+import sys
+import packets
+import chat
 
 stop_thread = False
 showblockupdates = False
-
-def processChatMessage(message):
-    if "Windows" in os.name:
-        print(message)
-        return
-
-    colorMappings = {
-        "&0": "\033[30m",
-        "&1": "\033[34m",
-        "&2": "\033[32m",
-        "&3": "\033[36m",
-        "&4": "\033[31m",
-        "&5": "\033[35m",
-        "&6": "\033[33m",
-        "&7": "\033[37m",
-        "&8": "\033[90m",
-        "&9": "\033[94m",
-        "&a": "\033[92m",
-        "&b": "\033[96m",
-        "&c": "\033[91m",
-        "&d": "\033[95m",
-        "&e": "\033[93m",
-        "&f": "\033[97m",
-    }
-
-    colorPattern = re.compile(r"&[0-9a-f]")
-    colorPatternSegments = colorPattern.split(message)
-
-    coloredMessage = []
-    for i in range(len(colorPatternSegments)):
-        segment = colorPatternSegments[i]
-        if segment in colorMappings:
-            coloredMessage.append(colorMappings[segment])
-        elif i > 0 and colorPatternSegments[i - 1] in colorMappings:
-            coloredMessage.append(segment)
-        else:
-            coloredMessage.append("\033[0m" + segment)
-
-    print("".join(coloredMessage) + "\033[0m")
 
 
 # Dexrn: Please work!!!
@@ -72,7 +34,7 @@ disconnectPlayerPacket = 0x0E
 updateUserTypePacket = 0x0F
 
 
-def packets(client_socket):
+def handlePackets(client_socket):
     global stop_thread
     while not stop_thread:
         try:
@@ -83,204 +45,134 @@ def packets(client_socket):
                 packet_id = data[0]
 
                 if packet_id == serverIdentificationPacket:
-                    try:
-                        packetDataDecoded = data[2:].decode("ascii")
-                        print(packetDataDecoded)
-                    except:
-                        continue
-
-                if packet_id == levelInitializePacket:
-                    try:
-                        # Process the Level Initialize packet (replace this with your logic)
-                        print("Received Level Initialize Packet")
-
-                        # You can add more handling or processing specific to the Level Initialize packet here
-
-                    except Exception as e:
-                        print("Error processing Level Initialize Packet:", str(e))
-                        continue
-
-                if packet_id == levelDataChunkPacket:
-                    try:
-                        # Extract the chunk data from the packet (excluding the packet ID)
-                        chunk_data = data[2:]
-
-                        # Remove trailing 0x00 padding
-                        chunk_data = chunk_data.rstrip(b'\x00')
-
-                        # Append the chunk data to the server_level.dat file
-                        with open('server_level.dat', 'wb') as level_file:
-                            level_file.write(chunk_data)
-                        
-                    except Exception as e:
-                        print("Error processing Level Data Chunk Packet:", str(e))
-                        continue
+                    packets.handleServerIdentificationPacket(data)
 
                 if packet_id == pingPacket:
-                    pass
+                    packets.handlePingPacket(data)
 
                 if packet_id == messagePacket:
-                    try:
-                        packetDataDecoded = data[1:].decode("ascii")
-                        processChatMessage(packetDataDecoded)
-                    except:
-                        continue
+                    packets.handleChatPacket(data)
 
                 if packet_id == disconnectPlayerPacket:
-                    try:
-                        packetDataDecoded = data[1:].decode("ascii")
-                        print(f"DISCONNECTED: {packetDataDecoded}")
-                        stop_thread = True
-                        receive_thread.join()
-                        client.close()
-                        break
-                    except:
-                        continue
-
+                    packets.handleDisconnectPacket(data)
+                if packet_id == setPosOrientationPacket:
+                    packets.handleSetPosOrientationPacket(data)
                 if packet_id == despawnPlayerPacket:
-                    try:
-                        packetDataDecoded = data[1:].decode("ascii")
-                        print(packetDataDecoded)
-                    except:
-                        continue
+                    packets.handleDespawnplayerPacket(data)
                 if packet_id == levelFinalizePacket:
-                    try:
-                        packetDataDecoded = data[1:].decode("ascii")
-                        print(packetDataDecoded)
-                    except:
-                        continue
+                    packets.handleLevelFinalizePacket(data)
                 if packet_id == setBlockPacket:
-                    try:
-                        if showblockupdates is True:
-                            # Dexrn: OH MY GOD XYZ ARE 2 BYTES
-                            X = int.from_bytes(data[1:3], byteorder="big")
-                            Y = int.from_bytes(data[3:5], byteorder="big")
-                            Z = int.from_bytes(data[5:7], byteorder="big")
-                            block_ID = int.from_bytes(data[7:], byteorder="big")
-
-                            if block_ID == 0:
-                                state = "broke"
-                                print(f"Player {state} block at ({X}, {Y}, {Z})")
-                            else:
-                                state = "placed"
-                                print(f"Player {state} block {block_ID} at ({X}, {Y}, {Z})")
-                    except UnicodeDecodeError:
-                        continue
+                    packets.handleSetBlockPacket(data, showblockupdates)
                 if packet_id == posUpdatePacket:
-                    try:
-                        X = int.from_bytes(data[3:3], byteorder="big")
-                        Y = int.from_bytes(data[4:4], byteorder="big")
-                        Z = int.from_bytes(data[5:5], byteorder="big")
-
-                        # print(f"Player Pos Update: {X}, {Y}, {Z}")
-                    except:
-                        continue
+                    packets.handlePosUpdatePacket(data)
             except UnicodeDecodeError as e:
-                print("Error decoding message:", str(e))
                 continue
         except socket.error as e:
-            print("Error receiving message:", str(e))
-            continue
+            print("Socket error: ", str(e))
+            stop_thread = True
+            sys.exit()
+        except Exception as e:
+            print("Packet Error! ", str(e))
 
 
 def postConnect(name):
-    global stop_thread
-    while True:
-        # chat handler
-        message = input("> ")
-        if message.startswith("i/"):
-            if message.startswith("i/help"):
-                print(f"List of available client commands:")
-                print(f"\"i/toggleshowblockupdates\": Shows a message in console when block updates happen on the server.")
-            if message.startswith("i/toggleshowblockupdates"):
-                global showblockupdates
-                if showblockupdates is True:
-                    print(f"Turned off Show Block Updates")
-                    showblockupdates = False
-                if showblockupdates is False:
-                    print(f"Turned on Show Block Updates")
-                    showblockupdates = True
-        if message.startswith("/"):
-            if message.startswith("/tp"):
-                command = message.split()
-                try:
-                    pname = name
-                    x = float(command[1])
-                    y = float(command[2])
-                    z = float(command[3])
-                    yaw = float(command[4])
-                    pitch = float(command[5])
+    try:
+        global stop_thread
+        while True:
+            # chat handler
+            message = input("> ")
+            if message.startswith("i/"):
+                if message.startswith("i/help"):
+                    print(f"List of available client commands:")
+                    print(f"\"i/toggleshowblockupdates\": Shows a message in console when block updates happen on the server.\n\"i/tp <x> <y> <z> <yaw> <pitch>\": Teleports the player to the specified XYZ coordinates.\n\"i/setblock <x> <y> <z> <place/destroy> <Block ID>\": Attempts to place a block at the specified XYZ coordinates.\n\"i/stop\": Closes the connection and the client.")
+                if message.startswith("i/toggleshowblockupdates"):
+                    global showblockupdates
+                    if showblockupdates is True:
+                        print(f"Turned off Show Block Updates")
+                        showblockupdates = False
+                    if showblockupdates is False:
+                        print(f"Turned on Show Block Updates")
+                        showblockupdates = True
+                if message.startswith("i/tp"):
+                    command = message.split()
+                    try:
+                        x = int(float(command[1]) * 32) 
+                        y = int(float(command[2]) * 32) 
+                        z = int(float(command[3]) * 32)  
+                        yaw = int(command[4])
+                        pitch = int(command[5])
 
-                    x_fixed = coordFix(x)
-                    y_fixed = coordFix(y)
-                    z_fixed = coordFix(z)
-                    yaw_fixed = coordFix(yaw)
-                    pitch_fixed = coordFix(pitch)
+                        tpPacket = bytearray()
+                        tpPacket += b"\x08"
+                        tpPacket += bytes([0xFF])
+                        tpPacket += x.to_bytes(2, byteorder="big", signed=True)
+                        tpPacket += y.to_bytes(2, byteorder="big", signed=True)
+                        tpPacket += z.to_bytes(2, byteorder="big", signed=True)
+                        tpPacket += yaw.to_bytes(1, byteorder="big", signed=False)
+                        tpPacket += pitch.to_bytes(1, byteorder="big", signed=False)
 
-                    tpPacket = bytearray()
-                    tpPacket += b"\x08"
-                    tpPacket += bytes([0xFF])
-                    tpPacket += x_fixed.to_bytes(2, byteorder="big", signed=True)
-                    tpPacket += y_fixed.to_bytes(2, byteorder="big", signed=True)
-                    tpPacket += z_fixed.to_bytes(2, byteorder="big", signed=True)
-                    tpPacket += yaw.to_bytes(1, byteorder="big", signed=True)
-                    tpPacket += pitch.to_bytes(1, byteorder="big", signed=True)
+                        print(tpPacket)
 
-                    print(tpPacket)
-                    client.send(tpPacket)
-                except IndexError:
-                    print("Invalid command format.")
+                        client.send(tpPacket)
+                    except IndexError:
+                        print("Invalid command format.")
+                        print(e)
+                        continue
+                    except ValueError:
+                        print("Invalid coordinates or block type. Please provide valid integers.")
+                        print(e)
+                        continue
+                    except Exception as e:
+                        print(e)
+                        continue
 
-                except ValueError:
-                    print(
-                        "Invalid coordinates or block type. Please provide valid integers."
+
+                if message.startswith("i/setblock"):
+                    command = message.split()
+                    try:
+                        x = int(command[1])
+                        y = int(command[2])
+                        z = int(command[3])
+                        updateBlockMode = str(command[4])
+                        id = int(command[5])
+
+                        sbPacket = bytearray()
+                        sbPacket += b"\x05"
+                        sbPacket += x.to_bytes(2, byteorder="big", signed=True)
+                        sbPacket += y.to_bytes(2, byteorder="big", signed=True)
+                        sbPacket += z.to_bytes(2, byteorder="big", signed=True)
+                        if updateBlockMode.lower() == 'place':
+                            sbPacket += (1).to_bytes(1, byteorder="big", signed=True)
+                        elif updateBlockMode.lower() == 'destroy':
+                            sbPacket += (0).to_bytes(1, byteorder="big", signed=True)
+                        sbPacket += id.to_bytes(1, byteorder="big", signed=True)
+
+                        print(sbPacket)
+                        client.send(sbPacket)
+                    except IndexError:
+                        print("Invalid command format.")
+
+                    except ValueError:
+                        print(
+                            "Invalid coordinates or block type. Please provide valid integers."
+                        )
+
+                if message.startswith("i/stop"):
+                    stop_thread = (
+                        True  
                     )
+                    receive_thread.join()  
+                    client.close()
+                    break
 
-            if message.startswith("/setblock"):
-                command = message.split()
-                try:
-                    pname = name
-                    x = int(command[1])
-                    y = int(command[2])
-                    z = int(command[3])
-                    mode = int(command[4])
-                    id = int(command[5])
+            else:
+                if not message.startswith("i/"):
+                    chat.sendMessage(message, client)
+    except KeyboardInterrupt:
+        print(f"Exiting!")
+        client.close()
+        sys.exit()
 
-                    sbPacket = bytearray()
-                    sbPacket += b"\x05"
-                    sbPacket += x.to_bytes(2, byteorder="big", signed=True)
-                    sbPacket += y.to_bytes(2, byteorder="big", signed=True)
-                    sbPacket += z.to_bytes(2, byteorder="big", signed=True)
-                    sbPacket += mode.to_bytes(1, byteorder="big", signed=True)
-                    sbPacket += id.to_bytes(1, byteorder="big", signed=True)
-
-                    print(sbPacket)
-                    client.send(sbPacket)
-                except IndexError:
-                    print("Invalid command format.")
-
-                except ValueError:
-                    print(
-                        "Invalid coordinates or block type. Please provide valid integers."
-                    )
-
-            if message.startswith("/stop"):
-                stop_thread = (
-                    True  
-                )
-                receive_thread.join()  
-                client.close()
-                break
-
-        else:
-            if not message.startswith("i/"):
-                packet2 = bytearray()
-                packet2 += b"\x0d"
-                packet2 += bytes([0xFF])
-                packet2 += message.ljust(64).encode("ascii")
-
-                # TCP Socket Horrors 2
-                client.send(packet2)
 
 
 client = None
@@ -303,7 +195,7 @@ def connect(pvn, name, mppass, ip, port):
     try:
         client.connect((ip, int(port)))
         client.send(packet)
-        receive_thread = threading.Thread(target=packets, args=(client,))
+        receive_thread = threading.Thread(target=handlePackets, args=(client,))
         receive_thread.start()
     except:
         print(f"\nFailed to connect to {ip}:{port}!")
@@ -315,33 +207,49 @@ def connect(pvn, name, mppass, ip, port):
 def main():
     print(
         "Welcome to Shitty Classic Client!\nhttps://github.com/Blizzardfur-Maxxx/Shitty-Classic-Client"
-    )
-    while True:
-        name = input("\nPlayer Name\n> ")
-        if name:
-            break
-        else:
-            print("Please enter a valid name.")
-    mppass1 = input('\nMPPass (Default is "-")\nNOTE: This will be shown as plaintext on screen while typing it.\n> ')
-    mppass = str(mppass1) if mppass1 else "-"
-    while True:
-        ip = input("\nServer IP Address\n> ")
-        if ip:
-            break
-        else:
-            print("Please enter a valid IP address.")
-    port1 = input("\nServer Port (Default is 25565)\n> ")
-    port = int(port1) if port1 else 25565
-    while True:
-        pvn_hex = input("\nPVN\n> ")
-        if pvn_hex:
-            break
-        else:
-            print("Please enter a valid PVN.")
-    if pvn_hex.startswith("x"):
-        pvn_hex = pvn_hex[1:]
-    pvn_int = int(pvn_hex, 16)
-    pvn = bytes([pvn_int])
+    )   
+    if os.path.exists('connect.txt'):
+        connectFile = open("connect.txt", "r")
+        name = connectFile.readline().strip()
+        mppass1 = connectFile.readline().strip()
+        mppass = str(mppass1) if mppass1 else "-"
+        ip = connectFile.readline().strip()
+        port1 = connectFile.readline().strip()
+        port = int(port1) if port1 else 25565
+        pvn_hex = connectFile.readline().strip()
+        if pvn_hex.startswith("x"):
+            pvn_hex = pvn_hex[1:]
+        pvn_int = int(pvn_hex, 16)
+        pvn = bytes([pvn_int])
+        connectFile.close()
+
+    else:
+        while True:
+            name = input("\nPlayer Name\n> ")
+            if name:
+                break
+            else:
+                print("Please enter a valid name.")
+        mppass1 = input('\nMPPass (Default is "-")\nNOTE: This will be shown as plaintext on screen while typing it.\n> ')
+        mppass = str(mppass1) if mppass1 else "-"
+        while True:
+            ip = input("\nServer IP Address\n> ")
+            if ip:
+                break
+            else:
+                print("Please enter a valid IP address.")
+        port1 = input("\nServer Port (Default is 25565)\n> ")
+        port = int(port1) if port1 else 25565
+        while True:
+            pvn_hex = input("\nPVN\n> ")
+            if pvn_hex:
+                break
+            else:
+                print("Please enter a valid PVN.")
+        if pvn_hex.startswith("x"):
+            pvn_hex = pvn_hex[1:]
+        pvn_int = int(pvn_hex, 16)
+        pvn = bytes([pvn_int])
     connect(pvn, name, mppass, ip, port)
 
 
