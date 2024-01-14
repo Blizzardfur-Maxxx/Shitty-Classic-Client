@@ -7,34 +7,30 @@ import chat
 
 stop_thread = False
 showblockupdates = False
+global cpe
+global name
+cpe = None
+receive_thread = None
 
+serverIdentificationPacket = 0x00
+extInfoPacket = 0x10
+extEntryPacket = 0x11
+pingPacket = 0x01
+messagePacket = 0x0D
+disconnectPlayerPacket = 0x0E
+setPosOrientationPacket = 0x08
+despawnPlayerPacket = 0x0C
+levelFinalizePacket = 0x04
+setBlockPacket = 0x06
+posUpdatePacket = 0x0A
 
-# Dexrn: Please work!!!
 def coordFix(value):
     scale_factor = 2**5
     scaled_value = int(value * scale_factor)
     clamped_value = max(min(scaled_value, 1023), -1024)
     return clamped_value // 32
 
-
-serverIdentificationPacket = 0x00
-pingPacket = 0x01
-levelInitializePacket = 0x02
-levelDataChunkPacket = 0x03
-levelFinalizePacket = 0x04
-setBlockPacket = 0x06
-spawnPlayerPacket = 0x07
-setPosOrientationPacket = 0x08
-posOrientationUpdatePacket = 0x09
-posUpdatePacket = 0x0A
-orientationUpdatePacket = 0x0B
-despawnPlayerPacket = 0x0C
-messagePacket = 0x0D
-disconnectPlayerPacket = 0x0E
-updateUserTypePacket = 0x0F
-
-
-def handlePackets(client_socket):
+def handlePackets(client_socket, cpe):
     global stop_thread
     while not stop_thread:
         try:
@@ -43,16 +39,16 @@ def handlePackets(client_socket):
                 break
             try:
                 packet_id = data[0]
-
                 if packet_id == serverIdentificationPacket:
                     packets.handleServerIdentificationPacket(data)
-
+                if packet_id == extInfoPacket and cpe == "yes":
+                    packets.handleExtInfoPacket(data, client)
+                if packet_id == extEntryPacket and cpe == "yes":
+                    packets.handleExtEntryPacket(data, client)
                 if packet_id == pingPacket:
                     packets.handlePingPacket(data)
-
                 if packet_id == messagePacket:
                     packets.handleChatPacket(data)
-
                 if packet_id == disconnectPlayerPacket:
                     packets.handleDisconnectPacket(data)
                 if packet_id == setPosOrientationPacket:
@@ -74,31 +70,31 @@ def handlePackets(client_socket):
         except Exception as e:
             print("Packet Error! ", str(e))
 
-
-def postConnect(name):
+def postConnect(client):
     try:
         global stop_thread
         while True:
-            # chat handler
             message = input("> ")
-            if message.startswith("i/"):
-                if message.startswith("i/help"):
+            if message.startswith("c/"):
+                if message.startswith("c/help"):
                     print(f"List of available client commands:")
-                    print(f"\"i/toggleshowblockupdates\": Shows a message in console when block updates happen on the server.\n\"i/tp <x> <y> <z> <yaw> <pitch>\": Teleports the player to the specified XYZ coordinates.\n\"i/setblock <x> <y> <z> <place/destroy> <Block ID>\": Attempts to place a block at the specified XYZ coordinates.\n\"i/stop\": Closes the connection and the client.")
-                if message.startswith("i/toggleshowblockupdates"):
+                    print(
+                        f'"c/toggleshowblockupdates": Shows a message in console when block updates happen on the server.\n'
+                        f'"c/tp <x> <y> <z> <yaw> <pitch>": Teleports the player to the specified XYZ coordinates.\n'
+                        f'"c/setblock <x> <y> <z> <place/destroy> <Block ID>": Attempts to place a block at the specified XYZ coordinates.\n'
+                        f'"c/stop": Closes the connection and the client.'
+                    )
+                if message.startswith("c/toggleshowblockupdates"):
                     global showblockupdates
-                    if showblockupdates is True:
-                        print(f"Turned off Show Block Updates")
-                        showblockupdates = False
-                    if showblockupdates is False:
-                        print(f"Turned on Show Block Updates")
-                        showblockupdates = True
-                if message.startswith("i/tp"):
+                    showblockupdates = not showblockupdates
+                    status = "on" if showblockupdates else "off"
+                    print(f"Turned {status} Show Block Updates")
+                if message.startswith("c/tp"):
                     command = message.split()
                     try:
-                        x = int(float(command[1]) * 32) 
-                        y = int(float(command[2]) * 32) 
-                        z = int(float(command[3]) * 32)  
+                        x = int(float(command[1]) * 32)
+                        y = int(float(command[2]) * 32)
+                        z = int(float(command[3]) * 32)
                         yaw = int(command[4])
                         pitch = int(command[5])
 
@@ -114,20 +110,11 @@ def postConnect(name):
                         print(tpPacket)
 
                         client.send(tpPacket)
-                    except IndexError:
-                        print("Invalid command format.")
-                        print(e)
-                        continue
-                    except ValueError:
-                        print("Invalid coordinates or block type. Please provide valid integers.")
-                        print(e)
-                        continue
-                    except Exception as e:
-                        print(e)
+                    except (IndexError, ValueError) as e:
+                        print(f"Invalid command format. {e}")
                         continue
 
-
-                if message.startswith("i/setblock"):
+                if message.startswith("c/setblock"):
                     command = message.split()
                     try:
                         x = int(command[1])
@@ -141,53 +128,34 @@ def postConnect(name):
                         sbPacket += x.to_bytes(2, byteorder="big", signed=True)
                         sbPacket += y.to_bytes(2, byteorder="big", signed=True)
                         sbPacket += z.to_bytes(2, byteorder="big", signed=True)
-                        if updateBlockMode.lower() == 'place':
-                            sbPacket += (1).to_bytes(1, byteorder="big", signed=True)
-                        elif updateBlockMode.lower() == 'destroy':
-                            sbPacket += (0).to_bytes(1, byteorder="big", signed=True)
+                        sbPacket += (1 if updateBlockMode.lower() == "place" else 0).to_bytes(1, byteorder="big", signed=True)
                         sbPacket += id.to_bytes(1, byteorder="big", signed=True)
 
                         print(sbPacket)
                         client.send(sbPacket)
-                    except IndexError:
-                        print("Invalid command format.")
+                    except (IndexError, ValueError) as e:
+                        print(f"Invalid command format. {e}")
 
-                    except ValueError:
-                        print(
-                            "Invalid coordinates or block type. Please provide valid integers."
-                        )
-
-                if message.startswith("i/stop"):
-                    stop_thread = (
-                        True  
-                    )
-                    receive_thread.join()  
-                    client.close()
-                    break
-
+                if message.startswith("c/stop"):
+                    stop_thread = True
+                    sys.exit()
             else:
-                if not message.startswith("i/"):
+                if not message.startswith("c/"):
                     chat.sendMessage(message, client)
     except KeyboardInterrupt:
-        print(f"Exiting!")
-        client.close()
+        print("Exiting!")
         sys.exit()
 
-
-
 client = None
-receive_thread = None
 
-
-# TCP Socket Horrors
-def connect(pvn, name, mppass, ip, port):
+def connect(pvn, name, mppass, ip, port, cpe):
     packet = bytearray()
     packet += b"\x00"
     packet += pvn
     packet += name.ljust(64).encode("ascii")
-    # magic value no changey
     packet += mppass.ljust(64).encode("ascii")
-    packet += b"\x00"
+    packet += b"\x42" if cpe == "yes" else b"\x00"
+    
     global client
     global receive_thread
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -195,20 +163,18 @@ def connect(pvn, name, mppass, ip, port):
     try:
         client.connect((ip, int(port)))
         client.send(packet)
-        receive_thread = threading.Thread(target=handlePackets, args=(client,))
+        receive_thread = threading.Thread(target=handlePackets, args=(client, cpe,))
         receive_thread.start()
-    except:
-        print(f"\nFailed to connect to {ip}:{port}!")
-    print(f"\nConnected!\nType i/help for client commands.\n")
-    postConnect(name)
+    except Exception as e:
+        print(f"\nFailed to connect to {ip}:{port}! {e}")
+    print(f"\nConnected!\nType c/help for client commands.\n")
+    postConnect(client)
 
-
-# connection settings and connect packet
 def main():
     print(
         "Welcome to Shitty Classic Client!\nhttps://github.com/Blizzardfur-Maxxx/Shitty-Classic-Client"
-    )   
-    if os.path.exists('connect.txt'):
+    )
+    if os.path.exists("connect.txt"):
         connectFile = open("connect.txt", "r")
         name = connectFile.readline().strip()
         mppass1 = connectFile.readline().strip()
@@ -221,8 +187,7 @@ def main():
             pvn_hex = pvn_hex[1:]
         pvn_int = int(pvn_hex, 16)
         pvn = bytes([pvn_int])
-        connectFile.close()
-
+        cpe = connectFile.readline().strip()
     else:
         while True:
             name = input("\nPlayer Name\n> ")
@@ -230,7 +195,9 @@ def main():
                 break
             else:
                 print("Please enter a valid name.")
-        mppass1 = input('\nMPPass (Default is "-")\nNOTE: This will be shown as plaintext on screen while typing it.\n> ')
+        mppass1 = input(
+            '\nMPPass (Default is "-")\nNOTE: This will be shown as plaintext on screen while typing it.\n> '
+        )
         mppass = str(mppass1) if mppass1 else "-"
         while True:
             ip = input("\nServer IP Address\n> ")
@@ -240,18 +207,25 @@ def main():
                 print("Please enter a valid IP address.")
         port1 = input("\nServer Port (Default is 25565)\n> ")
         port = int(port1) if port1 else 25565
-        while True:
-            pvn_hex = input("\nPVN\n> ")
-            if pvn_hex:
-                break
-            else:
-                print("Please enter a valid PVN.")
-        if pvn_hex.startswith("x"):
-            pvn_hex = pvn_hex[1:]
-        pvn_int = int(pvn_hex, 16)
-        pvn = bytes([pvn_int])
-    connect(pvn, name, mppass, ip, port)
-
+        cpe = input("\nCPE? (yes/no)\n> ")
+        if cpe == "yes":
+            pvn_hex = "7"
+            if pvn_hex.startswith("x"):
+                pvn_hex = pvn_hex[1:]
+            pvn_int = int(pvn_hex, 16)
+            pvn = bytes([pvn_int])
+        else:
+            while True:
+                pvn_hex = input("\nPVN\n> ")
+                if pvn_hex:
+                    break
+                else:
+                    print("Please enter a valid PVN.")
+            if pvn_hex.startswith("x"):
+                pvn_hex = pvn_hex[1:]
+            pvn_int = int(pvn_hex, 16)
+            pvn = bytes([pvn_int])
+    connect(pvn, name, mppass, ip, port, cpe)
 
 if __name__ == "__main__":
     main()
